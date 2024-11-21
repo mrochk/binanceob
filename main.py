@@ -27,8 +27,11 @@ class DepthDiffEvent(object):
         s += f'Asks: {self.get_n_asks_update()}]'
         return s
 
+ASK_LIMIT = 'ASK'
+BID_LIMIT = 'BID'
 class Orderbook(object):
-    def __init__(self, snapshot):
+
+    def __init__(self, snapshot : dict):
         self.midprice = self.volume = self.spread = 0
 
         self.bids_limit : list[self.Limit] = []
@@ -48,7 +51,7 @@ class Orderbook(object):
         self.__remove_empty()
         self.__sort()
 
-    def __initialize(self, bids, asks):
+    def __initialize(self, bids : list, asks : list):
         for e in bids:
             price, qty = list(map(float, e))
             limit = self.Limit(price, qty, 'BID')
@@ -67,30 +70,32 @@ class Orderbook(object):
         self.asks_limit = sorted(self.asks_limit, key=by_price)
 
     def __remove_empty(self):
-        i = 0
+        toremove = []
+
         for limit in self.asks_limit:
-            if limit.quantity == 0.0:
-                try:
-                    self.asks_limit.remove(limit)
-                    self.price2asks.pop(limit.price)
-                    i += 1
-                except ValueError:
-                    printerr(ValueError, f'when trying to remove {limit}')
-                except KeyError:
-                    printerr(KeyError, f'when trying to remove {limit}')
+            if limit.quantity == 0.0: toremove.append(limit)
 
+        for limit in toremove:
+            try:
+                self.asks_limit.remove(limit)
+                self.price2asks.pop(limit.price)
+            except ValueError:
+                printerr(ValueError, f'when trying to remove {limit}')
+            except KeyError:
+                printerr(KeyError, f'when trying to remove {limit}')
+
+        toremove.clear()
         for limit in self.bids_limit:
-            if limit.quantity == 0.0:
-                try:
-                    self.bids_limit.remove(limit)
-                    self.price2bids.pop(limit.price)
-                    i += 1
-                except ValueError:
-                    printerr(ValueError, f'when trying to remove {limit}')
-                except KeyError:
-                    printerr(KeyError, f'when trying to remove {limit}')
+            if limit.quantity == 0.0: toremove.append(limit)
 
-        print(f'<remove empty> removed {i} limits')
+        for limit in toremove:
+            try:
+                self.bids_limit.remove(limit)
+                self.price2bids.pop(limit.price)
+            except ValueError:
+                printerr(ValueError, f'when trying to remove {limit}')
+            except KeyError:
+                printerr(KeyError, f'when trying to remove {limit}')
 
     def __get_midprice(self):
         bestask = self.asks_limit[0]
@@ -110,9 +115,8 @@ class Orderbook(object):
             if price in self.price2asks.keys():
                 self.price2asks[price].quantity = qty 
                 updated += 1
-            else: 
-                if qty == 0: continue
-                new_limit =  self.Limit(price, qty, 'ASK')
+            elif qty > 0.0: 
+                new_limit =  self.AskLimit(price, qty)
                 self.price2asks[price] = new_limit
                 self.asks_limit.append(new_limit)
                 added += 1
@@ -123,9 +127,8 @@ class Orderbook(object):
             if price in self.price2bids.keys():
                 self.price2bids[price].quantity = qty 
                 updated += 1
-            else: 
-                if qty == 0: continue
-                new_limit = self.Limit(price, qty, 'BID')
+            elif qty > 0.0: 
+                new_limit = self.BidLimit(price, qty)
                 self.price2bids[price] = new_limit
                 self.bids_limit.append(new_limit)
                 added += 1
@@ -134,7 +137,6 @@ class Orderbook(object):
 
         self.__remove_empty()
         self.__sort()
-        self.__remove_empty()
 
         self.midprice = self.__get_midprice()
         self.spread   = self.__get_spread()
@@ -146,16 +148,16 @@ class Orderbook(object):
 
         for i in range(nlimits-1, -1, -1): s += f'{self.asks_limit[i]}\n'
 
-        s += ('-' * len(f'{self.asks_limit[0]}')) + '\n'
-        s += f'MidPrice: {self.midprice:.2f}, Spread: {self.spread:.4f}\n'
-        s += ('-' * len(f'{self.asks_limit[0]}')) + '\n'
+        s += ('-' * len(f'{self.asks_limit[0]}')) + '----\n'
+        s += f'MidPrice: {self.midprice}, Spread: {self.spread:.2f}\n'
+        s += ('-' * len(f'{self.asks_limit[0]}')) + '----\n'
 
         for i in range(nlimits): s += f'{self.bids_limit[i]}\n'
 
         print(s, flush=True)
 
     class Limit(object):
-        def __init__(self, price, quantity, limit_type):
+        def __init__(self, price : float, quantity : int, limit_type : str):
             if isinstance(price, str): price = float(price)
             if isinstance(quantity, str): quantity = float(quantity)
             self.limit_type = limit_type
@@ -164,6 +166,14 @@ class Orderbook(object):
 
         def __repr__(self):
             return f'{self.limit_type} Limit @ {self.price:.2f} of {self.quantity:.5f}'
+
+    class AskLimit(Limit):
+        def __init__(self, price : float, quantity : int):
+            super().__init__(price, quantity, ASK_LIMIT)
+
+    class BidLimit(Limit):
+        def __init__(self, price : float, quantity : int):
+            super().__init__(price, quantity, BID_LIMIT)
 
 BASE_SYMBOL = 'BTCUSDT'
 
@@ -192,6 +202,17 @@ def prune_buffer(last_update_id, buffer : list):
     before = len(buffer)
     while not is_first_event(last_update_id, buffer[0]): buffer.pop(0)
     print(f'<prune buffer> removed {before - len(buffer)} events')
+
+def stop_stream(twm : ThreadedWebsocketManager, stream_name):
+    try:
+        twm.stop_socket(stream_name)
+        time.sleep(0.1)
+        print(f'stream <{stream_name}> stopped successfully')
+    except: printerr('error when trying to stop wss stream')
+
+def stop_twm(twm : ThreadedWebsocketManager):
+    try:  twm.stop(); time.sleep(0.1); print(f'twm stopped successfully')
+    except: printerr('error when trying to stop twm')
 
 def main():
     symbol = get_symbol()
@@ -222,7 +243,7 @@ def main():
             if any(condition_list): return
             time.sleep(1)
 
-    socket_name = open_depth_stream(twm, callback_buffer, symbol, 100); time.sleep(1)
+    socket_name = open_depth_stream(twm, callback_buffer, symbol); time.sleep(1)
     
     snapshot = get_snapshot(symbol)
     last_update_id = snapshot['lastUpdateId']
@@ -233,21 +254,24 @@ def main():
 
     prune_buffer(last_update_id, buffer)
 
-    time.sleep(20)
+    time.sleep(2)
 
-    twm.stop_socket(socket_name)
-    twm.stop()
-
-    while True:
-        if buffer:
+    try:
+        while True:
+            if not buffer: continue
             msg = buffer.pop(0)
             event = DepthDiffEvent(msg)
             orderbook.update(event)
-            time.sleep(2)
             print()
             print()
-            orderbook.display(5)
+            orderbook.display(20)
+    except KeyboardInterrupt:
+        print(f'\nshutting down...')
+        stop_stream(twm, socket_name)
+        stop_twm(twm)
+        time.sleep(0.1)
+        print('orderbook stopped successfully')
+        exit(0)
 
-    
 
 if __name__ == '__main__': main()
