@@ -51,7 +51,7 @@ class Orderbook(object):
                 self.bids_limit.append(new_limit)
                 added += 1
 
-        print(f'<update> added {added} limits and updated {updated} limits')
+        print(f'added {added} limits and updated {updated} limits')
 
         self.__remove_empty()
         self.__sort()
@@ -121,11 +121,9 @@ class Orderbook(object):
         def emptylimit(limit : AskLimit | BidLimit): return limit.empty()
 
         toremove = list(filter(emptylimit, self.asks_limit))
-        print(len(toremove))
         for limit in toremove: self.__remove_limit(limit)
 
         toremove = list(filter(emptylimit, self.bids_limit))
-        print(len(toremove))
         for limit in toremove: self.__remove_limit(limit)
 
     def __get_midprice(self):
