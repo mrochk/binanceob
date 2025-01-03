@@ -28,7 +28,6 @@ if __name__ == '__main__':
 
     # get args
     args      = argparser.parse_args()
-
     symbols   = parse_symbols(args.symbols)
     writedata = parse_yes_no(args.writedata)
     display   = parse_yes_no(args.display)
