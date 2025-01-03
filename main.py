@@ -1,4 +1,4 @@
-from binanceob import BinanceOrderbook
+from binanceob       import BinanceOrderbook
 from multiprocessing import Process
 import argparse
 

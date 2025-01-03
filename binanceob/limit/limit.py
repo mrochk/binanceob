@@ -1,4 +1,4 @@
-class Limit(object):
+class Limit:
     def __init__(self, price : float, quantity : int, limit_type : str):
         if isinstance(price, str): price = float(price)
         if isinstance(quantity, str): quantity = float(quantity)

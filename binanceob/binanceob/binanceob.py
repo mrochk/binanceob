@@ -1,6 +1,6 @@
-from binance import Client, ThreadedWebsocketManager
+from binance            import Client, ThreadedWebsocketManager
 from binance.exceptions import BinanceAPIException
-from time import sleep
+from time               import sleep
 import json
 import os
 
@@ -8,7 +8,7 @@ from ..orderbook import Orderbook
 from ..event import Event
 from ..util import *
 
-class BinanceOrderbook(object):
+class BinanceOrderbook:
     symbol        : str
     interval      : str
     depth : int

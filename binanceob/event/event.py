@@ -1,4 +1,4 @@
-class Event(object):
+class Event:
     """
     Wrapper around the Binance 'Depth Diff.' event.
     https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams#diff-depth-stream
