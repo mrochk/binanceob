@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+
+@dataclass
 class Event:
     """
     Wrapper around the Binance 'Depth Diff.' event.
@@ -5,13 +8,22 @@ class Event:
     """
     def __init__(self, stream_msg : dict):
         Event.__msg_sanity_check(stream_msg)
-
         self.symbol          = stream_msg['s']
         self.timestamp       = stream_msg['E']
         self.asks_update     = stream_msg['a']
         self.bids_update     = stream_msg['b']
         self.first_update_id = stream_msg['U']
         self.last_update_id  = stream_msg['u']
+
+    def asdict(self) -> dict:
+        return {
+            'symbol'      : self.symbol,
+            'timestamp'   : self.timestamp,
+            'first_id'    : self.first_update_id,
+            'last_id'     : self.last_update_id,
+            'asks_updates': self.asks_update,
+            'bids_updates': self.bids_update,
+        }
 
     @staticmethod
     def __msg_sanity_check(msg : dict):

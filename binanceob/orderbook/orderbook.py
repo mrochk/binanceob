@@ -1,6 +1,6 @@
 from time    import time
 from ..event import Event
-from ..limit import BidLimit, AskLimit
+from ..limit import Limit, BidLimit, AskLimit
 from ..util  import *
 
 class Orderbook(object):
@@ -24,64 +24,8 @@ class Orderbook(object):
         assert len(self.asks) == len(self.bids)
         self.depth = len(self.asks)
 
-        self.__remove_empty_limits()
+        self.__rm_empty_limits()
         self.__sort_limits()
-
-    def update(self, event : Event): 
-        addedA, updatedA = self.update_asks(event.asks_update)
-        addedB, updatedB = self.update_bids(event.bids_update)
-
-        added   = addedA   + addedB
-        updated = updatedA + updatedB
-
-        print(f'<{self.symbol}> added {added} limits and updated {updated} limits')
-
-        self.__remove_empty_limits()
-        self.__sort_limits()
-
-        # remove if too many limits in ob
-        if len(self.asks) > self.max_limits: self.asks = self.asks[:self.max_limits]
-        if len(self.bids) > self.max_limits: self.bids = self.bids[:self.max_limits]
-
-        self.midprice = self.__get_midprice()
-        self.spread   = self.__get_spread()
-
-    def update_asks(self, updates):
-        added = updated = 0
-        for up in updates:
-            price, qty = list(map(float, up))
-
-            if price in self.price2asks.keys():
-                self.price2asks[price].quantity = qty 
-                updated += 1
-            elif qty > 0.0: 
-                new_limit =  AskLimit(price, qty)
-                self.price2asks[price] = new_limit
-                self.asks.append(new_limit)
-                added += 1
-        return added, updated
-
-    def update_bids(self, updates):
-        added = updated = 0
-        for up in updates:
-            price, qty = list(map(float, up))
-
-            if price in self.price2bids.keys():
-                self.price2bids[price].quantity = qty 
-                updated += 1
-            elif qty > 0.0: 
-                new_limit = BidLimit(price, qty)
-                self.price2bids[price] = new_limit
-                self.bids.append(new_limit)
-                added += 1
-        return added, updated
-
-    def as_dict(self, depth=10):
-        return {
-            'timestamp': time(),
-            'bids': [l.as_dict() for l in self.bids[:depth]],
-            'asks': [l.as_dict() for l in self.asks[:depth]],
-        }
 
     def display(self, nlimits=10):
         self.__sort_limits()
@@ -97,6 +41,57 @@ class Orderbook(object):
         for i in range(nlimits): s += f'{self.bids[i]}\n'
 
         print(s, flush=True)
+
+    def update(self, event : Event): 
+        addedA, updatedA = self.__update_asks(event.asks_update)
+        addedB, updatedB = self.__update_bids(event.bids_update)
+
+        added   = addedA   + addedB
+        updated = updatedA + updatedB
+
+        print(f'<{self.symbol}> added {added} limits and updated {updated} limits')
+
+        self.__rm_empty_limits()
+        self.__sort_limits()
+
+        # remove if too many limits in ob
+        if len(self.asks) > self.max_limits: 
+            self.asks = self.asks[:self.max_limits]
+        if len(self.bids) > self.max_limits: 
+            self.bids = self.bids[:self.max_limits]
+
+        self.midprice = self.__get_midprice()
+        self.spread   = self.__get_spread()
+
+    def __update_asks(self, updates):
+        added = updated = 0
+        for up in updates:
+            price, qty = list(map(float, up))
+
+            if price in self.price2asks.keys():
+                self.price2asks[price].quantity = qty 
+                updated += 1
+            elif qty > 0.0: 
+                new_limit =  AskLimit(price, qty)
+                self.price2asks[price] = new_limit
+                self.asks.append(new_limit)
+                added += 1
+        return added, updated
+
+    def __update_bids(self, updates):
+        added = updated = 0
+        for up in updates:
+            price, qty = list(map(float, up))
+
+            if price in self.price2bids.keys():
+                self.price2bids[price].quantity = qty 
+                updated += 1
+            elif qty > 0.0: 
+                new_limit = BidLimit(price, qty)
+                self.price2bids[price] = new_limit
+                self.bids.append(new_limit)
+                added += 1
+        return added, updated
 
     def __initialize(self, bids : list, asks : list):
         for e in bids:
@@ -127,6 +122,7 @@ class Orderbook(object):
             except KeyError:
                 print_error(KeyError, f'when trying to remove {limit}')
                 exit(1)
+
         elif isinstance(limit, BidLimit):
             try:
                 self.bids.remove(limit)
@@ -141,8 +137,8 @@ class Orderbook(object):
             print_error(f'<remove_limit> error: limit is neither bid or ask: {limit}')
             exit(1)
 
-    def __remove_empty_limits(self):
-        def emptylimit(limit : AskLimit | BidLimit): return limit.empty()
+    def __rm_empty_limits(self):
+        def emptylimit(limit : Limit): return limit.empty()
 
         toremove = list(filter(emptylimit, self.asks))
         for limit in toremove: self.__remove_limit(limit)
