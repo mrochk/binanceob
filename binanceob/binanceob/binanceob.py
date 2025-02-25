@@ -30,7 +30,7 @@ class BinanceOrderbook(object):
             n_asks, n_bids = len(msg['a']), len(msg['b'])
             print(f'event received ({n_bids} bids, {n_asks} asks)')
 
-        socket_name = self.__open_depth_stream(callback, 100)
+        socket_name = self.__open_depth_stream(callback)
         snapshot = self.__get_snapshot()
         last_update_id = snapshot['lastUpdateId']
         orderbook = Orderbook(snapshot)
@@ -64,15 +64,17 @@ class BinanceOrderbook(object):
     def __get_snapshot(self, limit=1000):
         return Client().get_order_book(symbol=self.symbol, limit=limit)
 
-    def __open_depth_stream(self, callback, interval=100):
-        assert interval is None or interval == 100, 'interval must be None for 1s, or 100 for 100ms'
+    def __open_depth_stream(self, callback, interval=None):
+        assert interval is None or interval in [100], 'interval must be None for 1000ms, 100 for 100ms'
         print(f'starting wss depth stream for symbol <{self.symbol}>...')
         try:
-            socket_name = self.twm.start_depth_socket(callback, self.symbol, interval=interval)
+            socket_name = self.twm.start_depth_socket(callback, self.symbol, interval=None)
             print(f'depth stream ({socket_name}) started successfully for symbol <{self.symbol}>')
             sleep(1)
             return socket_name
-        except: printerr('an error occured when trying to start <twm.start_depth_socket>')
+        except: 
+            printerr('an error occured when trying to start <twm.start_depth_socket>')
+            raise Exception()
 
     @staticmethod
     def __is_first_event(last_update_id, event):
